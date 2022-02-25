@@ -112,8 +112,6 @@ const config: webpack.Configuration & { devServer?: Configuration } = {
   ],
   devServer: {
     hot: true,
-    contentBase: './dist/',
-    clientLogLevel: 'warning',
     historyApiFallback: true,
   },
   optimization: {
