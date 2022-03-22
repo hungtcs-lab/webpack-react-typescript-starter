@@ -1,52 +1,42 @@
+import 'webpack-dev-server';
 import path from 'path';
 import webpack from 'webpack';
-import HtmlWebpackPlugin from 'html-webpack-plugin';
+import HTMLWebpackPlugin from 'html-webpack-plugin';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import TsconfigPathsWebpackPlugin from 'tsconfig-paths-webpack-plugin';
-import { Configuration } from 'webpack-dev-server';
-import { CleanWebpackPlugin } from 'clean-webpack-plugin';
+import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
+import TsConfigPathsWebpackPlugin from 'tsconfig-paths-webpack-plugin';
 
 const production = process.env.NODE_ENV === 'production';
-const isDevServer = !!process.env.WEBPACK_DEV_SERVER;
+const isWebpackServe = process.env.WEBPACK_SERVE === 'true';
 
-// bug: https://github.com/dividab/tsconfig-paths-webpack-plugin/issues/32
-delete process.env.TS_NODE_PROJECT;
-
-function getEntry() {
-  if(production || !isDevServer) {
-    return {
-      polyfills: './src/polyfills.ts',
-      main: './src/main.tsx',
-    };
-  } else {
-    return [
-      'react-hot-loader/patch',
-      'webpack-dev-server/client?http://localhost:3100',
-      'webpack/hot/only-dev-server',
-      './src/polyfills.ts',
-      './src/main.tsx',
-    ];
-  }
-}
-
-const config: webpack.Configuration & { devServer?: Configuration } = {
+export default <webpack.Configuration> {
   mode: production ? 'production' : 'development',
-  entry: getEntry(),
+  devtool: production ? false : 'source-map',
+  stats: {
+    preset: 'minimal',
+    chunks: true,
+    timings: true,
+    chunksSort: 'size',
+  },
+  entry: {
+    main: './src/main.tsx',
+  },
   output: {
     path: path.resolve(__dirname, 'dist'),
+    clean: true,
+    library: {
+      type: 'module',
+    },
     filename: production ? '[name].[contenthash].js' : '[name].js',
   },
   module: {
     rules: [
       {
-        test: /\.tsx?$/,
+        test: /\.tsx?$/i,
         use: [
           {
             loader: 'ts-loader',
-            options: {
-              configFile: production ? 'tsconfig.prod.json' : 'tsconfig.json',
-            },
           },
         ],
         include: [
@@ -71,16 +61,28 @@ const config: webpack.Configuration & { devServer?: Configuration } = {
           path.join(__dirname, './src/style.scss'),
         ],
       },
+      {
+        test: /\.svg$/i,
+        issuer: /\.[jt]sx?$/,
+        use: [
+          {
+            loader: '@svgr/webpack',
+            options: {
+              icon: true,
+              svgo: false,
+            },
+          }
+        ],
+        include: [
+          path.resolve(__dirname, './src/assets/icons'),
+        ],
+      },
     ],
   },
   plugins: [
-    new CleanWebpackPlugin({
-      verbose: true,
-    }),
-    new HtmlWebpackPlugin({
+    new HTMLWebpackPlugin({
       template: './src/index.html',
-      // chunks: ['polyfills', 'main'],
-      // chunksSortMode: 'manual',
+      scriptLoading: 'module',
     }),
     new CopyWebpackPlugin({
       patterns: [
@@ -89,35 +91,24 @@ const config: webpack.Configuration & { devServer?: Configuration } = {
       ],
     }),
     new MiniCssExtractPlugin({
-      filename: production ? '[name].[contenthash].css' : '[name].css'
+      filename: production ? 'style.[contenthash].css' : 'style.css',
     }),
+    isWebpackServe && new ReactRefreshWebpackPlugin(),
   ],
   resolve: {
-    alias: {
-      'react-dom': '@hot-loader/react-dom',
-    },
     plugins: [
-      new TsconfigPathsWebpackPlugin({
-        configFile: 'tsconfig.json',
-      }),
+      new TsConfigPathsWebpackPlugin(),
     ],
-    extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+    extensions: ['.ts', '.tsx', '.svg', '...'],
   },
-  devtool: production ? false : 'source-map',
-  externals: [
-    // {
-    //   react: 'React',
-    //   'react-dom': 'ReactDOM',
-    // },
-  ],
   devServer: {
     hot: true,
     historyApiFallback: true,
   },
+  experiments: {
+    outputModule: true,
+  },
   optimization: {
-    moduleIds: production ? 'natural' : 'named',
     runtimeChunk: 'single',
   },
 };
-
-export default config;
